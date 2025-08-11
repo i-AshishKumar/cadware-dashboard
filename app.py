@@ -15,24 +15,40 @@ st.sidebar.page_link("pages/Mailing_list.py", label="Mailing list Stats")
 
 tab1, tab2 = st.tabs(["Stats", "Trends"])
 with tab1:
+    
     # Job KPIs
     st.header("Job Application KPIs")
-    total_applications = len(reduced_all_applications)
-    female_applicants = len(reduced_all_applications[reduced_all_applications['gender']== 'Female'])
-    male_applicants = len(reduced_all_applications[reduced_all_applications['gender']== 'Male'])
+
+    # Get unique job types for filtering
+    unique_job_types = sorted(reduced_all_applications['job_type'].unique())
+
+    # Multiselect widget for filtering job types (default to all)
+    selected_job_types = st.multiselect(
+        'Filter by Job Types',
+        options=unique_job_types,
+        default=unique_job_types,
+        key='job_type_filter_tab1'
+    )
+
+    # Filter the DataFrame based on selected job types
+    filtered_df = reduced_all_applications[reduced_all_applications['job_type'].isin(selected_job_types)]
+
+    total_applications = len(filtered_df)
+    female_applicants = len(filtered_df[filtered_df['gender'] == 'Female'])
+    male_applicants = len(filtered_df[filtered_df['gender'] == 'Male'])
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.metric(label="Total Applications", value= total_applications, delta=total_applications)
-        st.metric(label="Applicants Available to Start Within a Week 🚨", value=num_immediate)
+        st.metric(label="Total Applications", value=total_applications, delta=total_applications)
+        st.metric(label="Applicants Available to Start Within a Week 🚨", value=len(filtered_df[(filtered_df['Earliest Available Date'] - filtered_df['Submission Date']).dt.days <= 7]))
     with col2:
-        st.metric(label="Female Applicants", value= female_applicants, delta=female_applicants)    
+        st.metric(label="Female Applicants", value=female_applicants, delta=female_applicants)    
     with col3:
-        st.metric(label="Male Applicants", value= male_applicants, delta=male_applicants)
+        st.metric(label="Male Applicants", value=male_applicants, delta=male_applicants)
 
     # Job Type Distribution (Pie)
-    job_type_counts = reduced_all_applications['job_type'].value_counts().reset_index()
+    job_type_counts = filtered_df['job_type'].value_counts().reset_index()
     job_type_counts.columns = ['job_type', 'count']
 
     st.header("Breakdown of Applicants by Job Type")
@@ -46,25 +62,24 @@ with tab1:
     )
     st.altair_chart(pie_chart, use_container_width=True)
 
-
     # Prepare location strings
-    reduced_all_applications['location'] = reduced_all_applications.apply(
+    filtered_df['location'] = filtered_df.apply(
         lambda row: f"{row['City']}, {row['State/Region']}, {row['Country']}".strip(', '),
         axis=1
     )
 
     # Convert unique locations to a tuple for cache stability
-    unique_locations = tuple(reduced_all_applications['location'].unique())  # Tuple ensures hashable input
+    unique_locations = tuple(filtered_df['location'].unique())  # Tuple ensures hashable input
 
     # Geocode locations (cached)
     lat_lon_dict = geocode_locations(unique_locations)
 
     # Map lat/lon back to DataFrame
-    reduced_all_applications['latitude'] = reduced_all_applications['location'].map(lambda x: lat_lon_dict.get(x, (None, None))[0])
-    reduced_all_applications['longitude'] = reduced_all_applications['location'].map(lambda x: lat_lon_dict.get(x, (None, None))[1])
+    filtered_df['latitude'] = filtered_df['location'].map(lambda x: lat_lon_dict.get(x, (None, None))[0])
+    filtered_df['longitude'] = filtered_df['location'].map(lambda x: lat_lon_dict.get(x, (None, None))[1])
 
     # Drop rows with missing lat/lon
-    df_map = reduced_all_applications.dropna(subset=['latitude', 'longitude'])
+    df_map = filtered_df.dropna(subset=['latitude', 'longitude'])
 
     # Display the map
     st.subheader("Geographic Map View of All Applicants")
@@ -73,9 +88,8 @@ with tab1:
     else:
         st.warning("No valid locations found for mapping.")
 
-
 with tab2:
-    st.title("Top 3 Cities with Most Applicants")
+    st.header("Top 3 Cities with Most Applicants")
     if reduced_all_applications.empty or 'City' not in reduced_all_applications.columns:
         st.error("Error: DataFrame is empty or 'City' column is missing.")
     else:
@@ -110,7 +124,7 @@ with tab2:
 
     df['availability_days'] = (df['Earliest Available Date'] - df['Submission Date']).dt.days
 
-    st.subheader('Days to availability Analysis')
+    st.header('Days to availability Analysis')
     fig2 = px.box(df, x='job_type', y='availability_days', 
                 labels={'job_type': 'Job Type', 'availability_days': 'Availability Days'},
                 color='job_type')
@@ -118,12 +132,56 @@ with tab2:
                     xaxis_tickangle=45, showlegend=False)
     st.plotly_chart(fig2)
 
+    df = reduced_all_applications
 
+    # Ensure 'Submission Date' is datetime for validation (though we'll use submit_month)
+    df['Submission Date'] = pd.to_datetime(df['Submission Date'], errors='coerce')
 
+    # Drop rows with invalid 'submit_month' or 'job_type'
+    df = df.dropna(subset=['submit_month', 'job_type'])
 
+    # Streamlit app title
+    st.header('Job Applications by Month and Job Type')
 
+    # Get unique job types for filtering
+    unique_job_types = sorted(df['job_type'].unique())
 
+    # Multiselect widget for filtering job types (default to all)
+    selected_job_types = st.multiselect(
+        'Select Job Types to Display',
+        options=unique_job_types,
+        default=unique_job_types
+    )
 
+    # Filter the DataFrame based on selected job types
+    filtered_df = df[df['job_type'].isin(selected_job_types)]
 
+    # Aggregate application counts by submit_month and job_type
+    agg_df = filtered_df.groupby(['submit_month', 'job_type']).size().reset_index(name='Application Count')
 
+    # Ensure submit_month is treated as a categorical variable with proper month order
+    month_order = ['January', 'February', 'March', 'April', 'May', 'June', 
+                'July', 'August', 'September', 'October', 'November', 'December']
+    agg_df['submit_month'] = pd.Categorical(agg_df['submit_month'], categories=month_order, ordered=True)
+    agg_df = agg_df.sort_values(['submit_month', 'job_type'])
 
+    # Plot a grouped bar chart using Plotly Express
+    if not agg_df.empty:
+        fig = px.bar(
+            agg_df,
+            x='submit_month',
+            y='Application Count',
+            color='job_type',
+            barmode='group',  # Group bars side-by-side for each job_type
+            labels={'submit_month': 'Month of Submission', 'Application Count': 'Number of Applications', 'job_type': 'Job Type'}
+        )
+        fig.update_layout(
+            xaxis_title='Month of Submission',
+            yaxis_title='Number of Applications',
+            legend_title='Job Type',
+            xaxis_tickangle=45,
+            hovermode='x unified'
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.write('No data available for the selected job types.')
