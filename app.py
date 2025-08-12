@@ -44,13 +44,27 @@ with tab1:
     female_applicants = len(filtered_df[filtered_df['gender'] == 'Female'])
     male_applicants = len(filtered_df[filtered_df['gender'] == 'Male'])
 
+    # Calculate most sought out job title with tie-breaker (alphabetical)
+
+
+
+
     col1, col2, col3 = st.columns(3)
 
     with col1:
         st.metric(label="Total Applications", value=total_applications, delta=total_applications)
         st.metric(label="Applicants Available to Start Within a Week 🚨", value=len(filtered_df[(filtered_df['Earliest Available Date'] - filtered_df['Submission Date']).dt.days <= 7]))
     with col2:
-        st.metric(label="Female Applicants", value=female_applicants, delta=female_applicants)    
+        st.metric(label="Female Applicants", value=female_applicants, delta=female_applicants)
+        job_counts = filtered_df['job_type'].value_counts()
+
+        if not job_counts.empty:
+            max_count = job_counts.max()
+            tied_jobs = job_counts[job_counts == max_count].index.tolist()
+            most_sought_job = sorted(tied_jobs)[0].replace("-", " ").title()  # alphabetically first among ties
+            st.metric(label="Popular Job Title", value=most_sought_job)
+        else:
+            st.metric(label="Popular Job Title", value="N/A", delta=None)    
     with col3:
         st.metric(label="Male Applicants", value=male_applicants, delta=male_applicants)
 
