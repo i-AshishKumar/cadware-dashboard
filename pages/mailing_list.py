@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import geoip2.database
 import requests
 import time
+from scipy.stats import gaussian_kde
 
 
 st.set_page_config(page_title="Mailing List Insights", layout="wide")
@@ -27,6 +29,11 @@ def load_data():
 
 df = load_data()
 
+# -------------------
+# Pre-processing Data
+# -------------------
+df = df.drop(columns = ['Submission ID', 'Submitter Browser', 'User Id', 'Submission Status','Submission Admin View URL', 'Source URL', 'Submission Serial Number'])
+df['How did you hear about us?'] = df['How did you hear about us?'].fillna(value="Online")
 
 # -------------------
 # Count sign-ups per source
@@ -128,32 +135,99 @@ fig2 = px.pie(filtered_df, names='Submitter Device', title='Device Share')
 st.plotly_chart(fig2, use_container_width=True)
 
 # -------------------
-# Hourly Pattern
+# Hourly distribution pattern
 # -------------------
 st.subheader("Hourly Sign-up Patterns")
-filtered_df['Hour'] = filtered_df['Submission Create Date'].dt.hour
-hourly = filtered_df.groupby('Hour').size().reset_index(name='Count')
-fig3 = px.bar(hourly, x='Hour', y='Count', title="Sign-ups by Hour of Day")
-st.plotly_chart(fig3, use_container_width=True)
+
+# Extract hours
+hours = filtered_df['Submission Create Date'].dt.hour.values
+
+# KDE calculation
+kde = gaussian_kde(hours, bw_method=0.3)  # bw_method controls smoothness
+x_grid = np.linspace(0, 23, 200)  # fine grid for smooth line
+kde_values = kde(x_grid)
+
+# Plot
+fig_kde = px.line(x=x_grid, y=kde_values, labels={'x': 'Hour of Day', 'y': 'Density'}, title="KDE of Sign-ups by Hour")
+fig_kde.update_layout(xaxis=dict(tickmode='linear', tick0=0, dtick=1))
+
+st.plotly_chart(fig_kde, use_container_width=True)
 
 # -------------------
-# Geographic Map
+# Mobile vs Desktop Ratio
+# -------------------
+st.subheader("Mobile vs Desktop Sign-up Ratio")
+
+# Map devices to categories
+def device_type(device):
+    if device in ['Android', 'iPhone']:
+        return 'Mobile'
+    elif device in ['Windows', 'Apple']:
+        return 'Desktop'
+    else:
+        return 'Other'
+
+filtered_df['Device Type'] = filtered_df['Submitter Device'].apply(device_type)
+
+device_counts = filtered_df['Device Type'].value_counts().reset_index()
+device_counts.columns = ['Device Type', 'Count']
+
+# Visualize
+fig = px.pie(device_counts, values='Count', names='Device Type', title="Mobile vs Desktop Sign-ups", color='Device Type',
+             color_discrete_map={'Mobile': 'mediumseagreen', 'Desktop': 'steelblue', 'Other': 'lightgray'}, hole=0.5)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# -------------------
+# Device trends over time 
 # -------------------
 
+st.header("Device Trends Over Time (Mobile vs Desktop)")
+
+# Map device types as before
+filtered_df['Device Type'] = filtered_df['Submitter Device'].apply(device_type)
+
+# Group by date and device type
+device_time = (
+    filtered_df.groupby([pd.Grouper(key='Submission Create Date', freq='D'), 'Device Type'])
+    .size()
+    .reset_index(name='Count')
+)
+
+# Pivot so columns are Device Types
+device_pivot = device_time.pivot(index='Submission Create Date', columns='Device Type', values='Count').fillna(0)
+
+# Calculate total sign-ups per day
+device_pivot['Total'] = device_pivot.sum(axis=1)
+
+# Calculate percentage share
+device_pivot['Mobile Share'] = device_pivot.get('Mobile', 0) / device_pivot['Total'] * 100
+device_pivot['Desktop Share'] = device_pivot.get('Desktop', 0) / device_pivot['Total'] * 100
+
+# Prepare data for plotting
+plot_df = device_pivot.reset_index()
+
+fig = px.line(
+    plot_df,
+    x='Submission Create Date',
+    y=['Mobile Share', 'Desktop Share'],
+    labels={'value': 'Percentage (%)', 'Submission Create Date': 'Date', 'variable': 'Device Type'},
+    title='Mobile vs Desktop Sign-up Share Over Time'
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# -------------------
+# Signups by Country
+# -------------------
+st.header("Signups by Country")
 # Load GeoJSON for countries (Natural Earth or similar)
 geojson_url = "https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json"
 geojson = requests.get(geojson_url).json()
 
-# Prepare data: country_counts is your DataFrame with 'Country' and 'Count'
-
-# Make sure your country names in country_counts match those in geojson['features'][].properties.name
-# You might need to map names to standard ones, e.g., "United States" vs "USA"
 country_counts = df.groupby('Country').size().reset_index(name='Count')
 country_counts['Country'] = country_counts['Country'].replace({
     "United States": "United States of America",
-    "Russia": "Russian Federation",
-    "South Korea": "Korea, Republic of",
-    # Add other mappings if needed
 })
 
 # Create the map
@@ -172,7 +246,6 @@ fig4 = px.choropleth_mapbox(
 )
 
 st.plotly_chart(fig4, use_container_width=True)
-
 
 # -------------------
 # Channel vs Device Heatmap
