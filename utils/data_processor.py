@@ -87,7 +87,7 @@ reduced_all_applications["State/Region"] = reduced_all_applications["Address"].a
 reduced_all_applications.rename(columns={"What is your earliest available date": "Earliest Available Date"}, inplace=True)
 reduced_all_applications.rename(columns={"Submission Create Date": "Submission Date"}, inplace=True)
 
-reduced_all_applications['Earliest Available Date'] = pd.to_datetime(reduced_all_applications['Earliest Available Date'])
+reduced_all_applications['Earliest Available Date'] = pd.to_datetime(reduced_all_applications['Earliest Available Date'], format='%d/%m/%Y')
 
 reduced_all_applications["Available_DayOfWeek"] = reduced_all_applications["Earliest Available Date"].dt.day_name()
 reduced_all_applications["Available_Month"] = reduced_all_applications["Earliest Available Date"].dt.month_name()
