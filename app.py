@@ -11,7 +11,7 @@ st.title('📊 Cadware Jobs Dashboard')
 COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD', '#D4A5A5', '#9B59B6']
 st.sidebar.title("Navigation")
 st.sidebar.page_link("app.py", label="Job Stats")
-st.sidebar.page_link("pages/Mailing_list.py", label="Mailing list Stats")
+st.sidebar.page_link("pages/mailing_list.py", label="Mailing list Stats")
 
 # Geocode all unique locations upfront (before filtering)
 # Create location strings for the full dataset
