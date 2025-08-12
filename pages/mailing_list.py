@@ -12,7 +12,7 @@ st.set_page_config(page_title="Mailing List Insights", layout="wide")
 
 st.sidebar.title("Navigation")
 st.sidebar.page_link("app.py", label="Job Stats")
-st.sidebar.page_link("pages/Mailing_list.py", label="Mailing list Stats")
+st.sidebar.page_link("pages/mailing_list.py", label="Mailing list Stats")
 
 # -------------------
 # Load Data
