@@ -8,7 +8,7 @@ import time
 from scipy.stats import gaussian_kde
 
 
-st.set_page_config(page_title="Mailing List Insights", layout="wide")
+st.set_page_config(page_title="Mailing List Insights", layout="wide", menu_items=None)
 
 st.sidebar.title("Navigation")
 st.sidebar.page_link("app.py", label="Job Stats")

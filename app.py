@@ -5,7 +5,7 @@ import altair as alt
 from utils.data_processor import geocode_locations  # Ensure this function is defined in your utils
 from utils.data_processor import reduced_all_applications, num_immediate
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", menu_items=None)
 st.title('📊 Cadware Jobs Dashboard')
 # Color palette for consistency across charts
 COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD', '#D4A5A5', '#9B59B6']
