@@ -69,6 +69,7 @@ with tab1:
         st.metric(label="Male Applicants", value=male_applicants, delta=male_applicants)
 
     # Job Type Distribution (Pie)
+    st.header("Applications for each job title")
     job_type_counts = filtered_df['job_type'].value_counts().reset_index()
     job_type_counts.columns = ['job_type', 'count']
 
